@@ -1,0 +1,32 @@
+# 语音识别（Whisper，Apple 芯片 GPU 版）及其依赖。版本是实测可用的组合。
+# 一般不用手动安装：运行 bash install.sh 会自动装好。
+# 手动安装：./runtime/bin/python -m pip install --no-deps -r requirements.txt
+# （--no-deps 是为了不装 mlx-whisper 声明但实际用不到的 torch，省几百 MB）
+anyio==4.16.0
+certifi==2026.10.23
+charset-normalizer==3.5.2
+click==8.5.1
+filelock==4.2.10
+fsspec==2026.9.0
+h11==0.16.0
+hf-xet==1.8.0
+httpcore2==2.16.0
+httpx2==2.16.0
+huggingface-hub==2.4.0
+idna==3.20
+llvmlite==0.49.0
+mlx==0.32.2
+mlx-metal==0.32.2
+mlx-whisper==0.4.3
+more-itertools==11.2.1
+numba==0.67.0
+numpy==2.4.1
+pyyaml==6.0.3
+regex==2026.11.9
+requests==2.34.2
+scipy==1.17.0
+tiktoken==0.14.0
+tqdm==4.70.1
+truststore==0.10.5
+typing-extensions==4.16.0
+urllib3==2.8.0

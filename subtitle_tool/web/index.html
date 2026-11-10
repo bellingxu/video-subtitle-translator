@@ -1,0 +1,819 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>字幕翻译工具</title>
+<style>
+:root {
+  --bg: #f4f4f6; --card: #ffffff; --field: #ededf1; --text: #1c1c1f; --muted: #6b6b73; --line: #e2e2e8;
+  --accent: #4f52d9; --accent-ink: #ffffff; --accent-weak: #ebebfd;
+  --ok: #17854a; --ok-weak: #e2f5ea; --err: #c2352c; --err-weak: #fceceb; --warn: #9a5b00; --warn-weak: #fdf1dc;
+  --shadow: 0 1px 2px rgba(20,20,40,.05), 0 6px 20px rgba(20,20,40,.05);
+  --radius: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #101012; --card: #1b1b1f; --field: #26262c; --text: #f1f1f4; --muted: #9c9ca6; --line: #2e2e35;
+    --accent: #8587f7; --accent-ink: #101012; --accent-weak: #25264d;
+    --ok: #4fce8a; --ok-weak: #15301f; --err: #ff7b72; --err-weak: #3a1a18; --warn: #f0b354; --warn-weak: #36290f;
+    --shadow: 0 1px 2px rgba(0,0,0,.4);
+  }
+}
+* { box-sizing: border-box; }
+html { color-scheme: light dark; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.55 -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
+
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px 56px; }
+header.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 22px 0 18px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.logo {
+  width: 40px; height: 40px; border-radius: 11px; background: var(--accent); color: var(--accent-ink);
+  display: grid; place-items: center; font-size: 20px; font-weight: 700;
+}
+h1 { font-size: 19px; margin: 0; letter-spacing: .01em; }
+.brand p { margin: 0; color: var(--muted); font-size: 12.5px; }
+.top-actions { display: flex; align-items: center; gap: 8px; }
+
+.card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px 20px; margin-bottom: 16px; }
+.card h2 { font-size: 15px; margin: 0 0 14px; display: flex; align-items: center; gap: 9px; }
+.step {
+  width: 22px; height: 22px; border-radius: 50%; background: var(--accent-weak); color: var(--accent);
+  display: inline-grid; place-items: center; font-size: 12.5px; font-weight: 700; flex: none;
+}
+.grid { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.muted { color: var(--muted); }
+.small { font-size: 12.5px; }
+
+.btn {
+  border: 1px solid var(--line); background: var(--card); border-radius: 9px; padding: 7px 14px; cursor: pointer;
+  white-space: nowrap; transition: background .12s, opacity .12s;
+}
+.btn:hover:not(:disabled) { background: var(--field); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.btn.primary:hover:not(:disabled) { background: var(--accent); filter: brightness(1.08); }
+.btn.big { padding: 10px 22px; font-size: 15px; border-radius: 11px; }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--muted); }
+.btn.danger { color: var(--err); }
+.btn.sm { padding: 4px 10px; font-size: 12.5px; border-radius: 7px; }
+.link { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; }
+.link:hover { text-decoration: underline; }
+a { color: var(--accent); }
+
+.chip {
+  border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 5px 12px 5px 10px;
+  display: inline-flex; align-items: center; gap: 7px; cursor: pointer; font-size: 12.5px;
+}
+.chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.chip.ok .dot { background: var(--ok); }
+.chip.bad .dot { background: var(--err); }
+.chip.bad { color: var(--err); }
+
+/* 文件夹 */
+.folder { display: flex; align-items: center; gap: 10px; padding: 9px 0; }
+.folder + .folder { border-top: 1px solid var(--line); }
+.folder .info { flex: 1; min-width: 0; }
+.folder .label { font-size: 12.5px; color: var(--muted); }
+.folder .path { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+.folder .path.unset { color: var(--muted); font-weight: 400; direction: ltr; }
+
+/* 设置项 */
+.field { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+.field > .name { width: 76px; flex: none; color: var(--muted); }
+.field > .ctl { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
+.seg { display: inline-flex; background: var(--field); border-radius: 9px; padding: 3px; gap: 2px; }
+.seg button {
+  border: 0; background: transparent; padding: 5px 13px; border-radius: 7px; cursor: pointer; color: var(--muted);
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+}
+.seg button.on { background: var(--card); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.14); }
+.seg button:disabled { cursor: not-allowed; }
+.posico { width: 20px; height: 13px; border: 1.5px solid currentColor; border-radius: 3px; position: relative; opacity: .8; }
+.posico::after { content: ""; position: absolute; left: 3px; right: 3px; height: 2px; background: currentColor; border-radius: 1px; }
+.posico.top::after { top: 1.5px; } .posico.middle::after { top: 4px; } .posico.bottom::after { bottom: 1.5px; }
+input[type=range] { flex: 1; min-width: 0; accent-color: var(--accent); }
+.val { width: 44px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12.5px; }
+.locked .field, .locked .folder { opacity: .55; pointer-events: none; }
+
+/* 预览 */
+.previewbox {
+  position: relative; background: #000; border-radius: 10px; overflow: hidden; aspect-ratio: 16 / 9;
+  display: grid; place-items: center;
+}
+.previewbox img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.previewbox .hint { position: absolute; color: #bbb; text-align: center; padding: 20px; font-size: 13px; }
+.previewbox.loading::after {
+  content: ""; position: absolute; top: 10px; right: 10px; width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.scrub { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.scrub .time { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+.pvmeta { margin-top: 6px; font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 视频列表 */
+.listhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.listhead .tools { display: flex; gap: 14px; align-items: center; font-size: 12.5px; color: var(--muted); }
+.list { border: 1px solid var(--line); border-radius: 10px; max-height: 430px; overflow: auto; }
+.row { display: grid; grid-template-columns: 34px minmax(0, 1fr) 70px minmax(150px, 230px); align-items: center; gap: 4px; padding: 7px 12px 7px 4px; cursor: pointer; }
+.row + .row { border-top: 1px solid var(--line); }
+.row:hover { background: color-mix(in srgb, var(--field) 55%, transparent); }
+.row.current { background: var(--accent-weak); }
+.row .ck { display: grid; place-items: center; height: 100%; cursor: pointer; }
+.row input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+.row .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .size { color: var(--muted); font-size: 12.5px; text-align: right; font-variant-numeric: tabular-nums; }
+.row .status { font-size: 12.5px; text-align: right; display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
+.row .status .txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .bar { height: 3px; border-radius: 2px; background: var(--field); margin-top: 5px; overflow: hidden; }
+.row .bar i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 2px; transition: width .6s linear; }
+.pill { padding: 2px 9px; border-radius: 999px; font-size: 12px; white-space: nowrap; }
+.pill.ok { background: var(--ok-weak); color: var(--ok); }
+.pill.err { background: var(--err-weak); color: var(--err); }
+.pill.note { background: var(--field); color: var(--muted); }
+.empty { padding: 34px 20px; text-align: center; color: var(--muted); }
+
+.runbar { display: flex; align-items: center; gap: 14px; margin-top: 14px; flex-wrap: wrap; }
+.runbar .grow { flex: 1; min-width: 200px; }
+.total { height: 8px; border-radius: 4px; background: var(--field); overflow: hidden; }
+.total i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 4px; transition: width .8s linear; }
+.runtext { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+.notice { border-radius: 10px; padding: 11px 14px; margin-top: 14px; display: flex; align-items: center; gap: 12px; justify-content: space-between; flex-wrap: wrap; }
+.notice.ok { background: var(--ok-weak); color: var(--ok); }
+.notice.err { background: var(--err-weak); color: var(--err); }
+.notice.warn { background: var(--warn-weak); color: var(--warn); }
+
+/* Key 引导 */
+.banner { border: 1.5px solid var(--accent); }
+.banner .keyrow { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.input {
+  border: 1px solid var(--line); background: var(--card); border-radius: 9px; padding: 8px 11px; min-width: 0; outline: none;
+}
+.input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-weak); }
+.banner .input { flex: 1; min-width: 240px; font-family: ui-monospace, Menlo, monospace; }
+.errtext { color: var(--err); font-size: 12.5px; margin-top: 8px; }
+
+/* 对话框 */
+dialog { border: 0; border-radius: 16px; padding: 0; background: var(--card); color: var(--text); width: min(640px, calc(100vw - 32px)); box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+dialog::backdrop { background: rgba(0,0,0,.42); }
+.dlg-head { padding: 18px 20px 12px; display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+.dlg-head h3 { margin: 0; font-size: 16px; }
+.dlg-body { padding: 0 20px; }
+.dlg-foot { padding: 14px 20px 18px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.crumbs { display: flex; flex-wrap: wrap; gap: 2px; align-items: center; font-size: 13px; margin-bottom: 10px; }
+.crumbs button { border: 0; background: none; padding: 2px 5px; border-radius: 5px; cursor: pointer; color: var(--accent); }
+.crumbs button:hover { background: var(--accent-weak); }
+.crumbs button:last-child { color: var(--text); font-weight: 600; cursor: default; }
+.crumbs span { color: var(--muted); }
+.shortcuts { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.dirs { border: 1px solid var(--line); border-radius: 10px; height: 290px; overflow: auto; }
+.dir { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; border: 0; background: none; padding: 8px 12px; cursor: pointer; }
+.dir + .dir { border-top: 1px solid var(--line); }
+.dir:hover { background: var(--field); }
+.dir .ico { width: 18px; height: 14px; border-radius: 3px; background: var(--accent); opacity: .75; flex: none; position: relative; }
+.dir .ico::before { content: ""; position: absolute; top: -3px; left: 0; width: 8px; height: 4px; border-radius: 2px 2px 0 0; background: inherit; }
+.dir span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.form-row { margin-bottom: 16px; }
+.form-row > label { display: block; font-weight: 600; margin-bottom: 5px; }
+.form-row .help { color: var(--muted); font-size: 12.5px; margin-top: 5px; }
+textarea.input { width: 100%; min-height: 76px; resize: vertical; }
+select.input { min-width: 220px; }
+.check { display: flex; gap: 9px; align-items: flex-start; cursor: pointer; }
+.check input { margin-top: 3px; accent-color: var(--accent); }
+
+#toast {
+  position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px); background: #222; color: #fff;
+  padding: 10px 18px; border-radius: 11px; opacity: 0; pointer-events: none; transition: all .25s; max-width: min(560px, 90vw); z-index: 99;
+  box-shadow: 0 8px 30px rgba(0,0,0,.3);
+}
+#toast.show { opacity: 1; transform: translateX(-50%); }
+#toast.err { background: #b3261e; }
+#gone { position: fixed; inset: 0; background: var(--bg); display: grid; place-items: center; text-align: center; z-index: 200; padding: 24px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="logo">字</div>
+      <div>
+        <h1>字幕翻译工具</h1>
+        <p>听写台词 → DeepSeek 翻译 → 把中文字幕压进视频</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button class="chip" id="keyChip" title="点击查看或更换 API Key"><span class="dot"></span><span id="keyChipText">检查中…</span></button>
+      <button class="btn ghost" id="settingsBtn">设置</button>
+      <button class="btn ghost" id="quitBtn" title="关闭这个工具">退出</button>
+    </div>
+  </header>
+
+  <section class="card banner" id="keyBanner" hidden>
+    <h2><span class="step">0</span>第一次使用：填入你的 DeepSeek API Key</h2>
+    <div class="muted">翻译要用到 DeepSeek 的接口。到
+      <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener">platform.deepseek.com → API Keys</a>
+      创建一个 Key（以 sk- 开头），粘贴到下面。Key 只保存在这台电脑上；几十集电视剧的翻译费用大约几块钱。</div>
+    <div class="keyrow">
+      <input class="input" id="keyInput" type="password" placeholder="sk-…" autocomplete="off" spellcheck="false">
+      <button class="btn primary" id="keySave">保存并验证</button>
+    </div>
+    <div class="errtext" id="keyError" hidden></div>
+  </section>
+
+  <div class="grid">
+    <div id="controls">
+      <section class="card">
+        <h2><span class="step">1</span>文件夹</h2>
+        <div class="folder">
+          <div class="info"><div class="label">视频在哪里</div><div class="path" id="inputPath"></div></div>
+          <button class="btn" data-pick="input">选择…</button>
+        </div>
+        <div class="folder">
+          <div class="info"><div class="label">加好字幕的视频存到哪里</div><div class="path" id="outputPath"></div></div>
+          <button class="btn" data-pick="output">选择…</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2><span class="step">2</span>字幕样式</h2>
+        <div class="field">
+          <div class="name">位置</div>
+          <div class="ctl"><div class="seg" data-key="position">
+            <button data-value="top"><i class="posico top"></i>顶部</button>
+            <button data-value="middle"><i class="posico middle"></i>中间</button>
+            <button data-value="bottom"><i class="posico bottom"></i>底部</button>
+          </div></div>
+        </div>
+        <div class="field" id="marginField">
+          <div class="name">离边缘</div>
+          <div class="ctl"><input type="range" data-key="margin" min="0" max="30" step="0.5"><span class="val" id="marginVal"></span></div>
+        </div>
+        <div class="field">
+          <div class="name">字号</div>
+          <div class="ctl"><input type="range" data-key="font_scale" min="3.5" max="11" step="0.25"><span class="val" id="font_scaleVal"></span></div>
+        </div>
+        <div class="field">
+          <div class="name">显示内容</div>
+          <div class="ctl"><div class="seg" data-key="bilingual">
+            <button data-value="false">只要中文</button>
+            <button data-value="true">中文 + 原文</button>
+          </div></div>
+        </div>
+        <div class="field">
+          <div class="name">原声语言</div>
+          <div class="ctl"><div class="seg" data-key="source_lang">
+            <button data-value="auto">自动判断</button>
+            <button data-value="ja">日语</button>
+            <button data-value="en">英语</button>
+          </div></div>
+        </div>
+      </section>
+    </div>
+
+    <section class="card">
+      <h2>预览<span class="muted small" style="font-weight:400" id="pvNote"></span></h2>
+      <div class="previewbox" id="previewBox">
+        <img id="previewImg" alt="" hidden>
+        <div class="hint" id="previewHint">选好视频文件夹后，这里会显示加上字幕的效果</div>
+      </div>
+      <div class="scrub">
+        <input type="range" id="scrub" min="0" max="100" step="0.5" value="0" disabled>
+        <span class="time" id="scrubTime">--:-- / --:--</span>
+      </div>
+      <div class="pvmeta" id="pvMeta">拖动滑块换一个画面；点下面列表里的视频可以换一集预览。</div>
+    </section>
+  </div>
+
+  <section class="card">
+    <div class="listhead">
+      <h2 style="margin:0"><span class="step">3</span>视频<span class="muted small" style="font-weight:400" id="listCount"></span></h2>
+      <div class="tools" id="listTools" hidden>
+        <button class="link" data-select="all">全选</button>
+        <button class="link" data-select="todo">只选没做过的</button>
+        <button class="link" data-select="none">全不选</button>
+      </div>
+    </div>
+    <div class="list" id="videoList"><div class="empty">还没有选择视频文件夹</div></div>
+
+    <div class="runbar" id="idleBar">
+      <button class="btn primary big" id="startBtn" disabled>开始添加字幕</button>
+      <span class="muted small" id="startHint"></span>
+    </div>
+    <div class="runbar" id="runBar" hidden>
+      <div class="grow">
+        <div class="total"><i id="totalBar"></i></div>
+        <div class="runtext" id="runText"></div>
+      </div>
+      <button class="btn danger" id="cancelBtn">取消</button>
+    </div>
+    <div class="notice" id="notice" hidden><span id="noticeText"></span><span id="noticeActions"></span></div>
+  </section>
+
+  <p class="muted small" style="text-align:center">识别在你的 Mac 本地完成；只有台词文字会发给 DeepSeek 翻译。识别和翻译结果会保存下来，换个字幕位置重做时不用重新花钱。</p>
+</div>
+
+<dialog id="folderDlg">
+  <div class="dlg-head"><h3 id="folderTitle"></h3><button class="btn ghost sm" data-close>关闭</button></div>
+  <div class="dlg-body">
+    <div class="shortcuts" id="shortcuts"></div>
+    <div class="crumbs" id="crumbs"></div>
+    <div class="dirs" id="dirs"></div>
+    <div class="errtext" id="folderError" hidden></div>
+  </div>
+  <div class="dlg-foot">
+    <span class="small muted" id="folderInfo"></span>
+    <span style="display:flex;gap:8px">
+      <button class="btn" id="mkdirBtn">新建文件夹</button>
+      <button class="btn primary" id="folderChoose">选择这个文件夹</button>
+    </span>
+  </div>
+</dialog>
+
+<dialog id="settingsDlg">
+  <div class="dlg-head"><h3>设置</h3><button class="btn ghost sm" data-close>完成</button></div>
+  <div class="dlg-body">
+    <div class="form-row">
+      <label>DeepSeek API Key</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input class="input" id="keyInput2" type="password" placeholder="sk-…" autocomplete="off" spellcheck="false" style="flex:1;min-width:220px;font-family:ui-monospace,Menlo,monospace">
+        <button class="btn" id="keySave2">保存并验证</button>
+      </div>
+      <div class="help" id="keyState"></div>
+      <div class="errtext" id="keyError2" hidden></div>
+    </div>
+    <div class="form-row">
+      <label for="hint">这部剧的剧情提示（可不填）</label>
+      <textarea class="input" id="hint" placeholder="例如：这是 NHK 晨间剧《ファイト》，女主角叫木戸優（きど ゆう），家里开弹簧工厂。"></textarea>
+      <div class="help">写上剧名、主要人物的名字、性别和关系，翻译会更准、人名更统一。提示是跟着“视频文件夹”走的，换一个文件夹（另一部剧）可以另写一份。改了以后，重新处理的视频会重新翻译。</div>
+    </div>
+    <div class="form-row">
+      <label>压制方式</label>
+      <div class="seg" data-key="encoder">
+        <button data-value="hardware">省电安静</button>
+        <button data-value="software">文件更小</button>
+      </div>
+      <div class="help"><b>省电安静</b>：用 Mac 自带的硬件编码芯片，几乎不占 CPU，电脑不烫、风扇不吵；画质一样，文件大约大四成（15 分钟的标清视频约 225 MB）。<br><b>文件更小</b>：用软件编码，文件最小（约 160 MB），但 CPU 会跑满，风扇会响。两种速度差不多。</div>
+    </div>
+    <div class="form-row">
+      <label for="model">翻译模型</label>
+      <select class="input" id="model"></select>
+      <div class="help">默认的 flash 又快又便宜，日常足够；pro 更贵一些，翻译更讲究。</div>
+    </div>
+    <div class="form-row">
+      <label class="check"><input type="checkbox" id="useEmbedded"><span>视频自带文字字幕（或旁边有同名 .srt 文件）时，直接翻译字幕<br><span class="help">比听写更准也更快。没有字幕的视频会自动改用语音识别。</span></span></label>
+    </div>
+  </div>
+  <div class="dlg-foot"><span class="small muted" id="versionText"></span><button class="btn primary" data-close>完成</button></div>
+</dialog>
+
+<dialog id="askDlg" style="width:min(440px, calc(100vw - 32px))">
+  <div class="dlg-head"><h3 id="askText" style="font-weight:500;font-size:14.5px;line-height:1.6"></h3></div>
+  <div class="dlg-body"><input class="input" id="askInput" style="width:100%" hidden></div>
+  <div class="dlg-foot" style="justify-content:flex-end">
+    <button class="btn" id="askNo">取消</button>
+    <button class="btn primary" id="askYes">确定</button>
+  </div>
+</dialog>
+
+<div id="toast"></div>
+<div id="gone" hidden><div><h1>工具已关闭</h1><p class="muted">可以关掉这个页面了。下次要用时，再双击“字幕翻译工具”启动。</p></div></div>
+
+<script>
+"use strict";
+const $ = (sel, el = document) => el.querySelector(sel);
+const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
+const S = {
+  settings: {}, hasKey: false, keyTail: "", keyInfo: null,
+  videos: [], selected: new Set(), listError: "",
+  pvPath: null, pvInfo: null, pvT: 0,
+  job: null, polling: false, quitting: false,
+};
+
+// ───────── 小工具 ─────────
+async function api(path, body) {
+  const opt = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+  let res;
+  try { res = await fetch(path, opt); }
+  catch (e) { throw new Error("连不上工具的后台程序（它可能已经被关掉了）"); }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `出错了（${res.status}）`);
+  return data;
+}
+let toastTimer;
+function toast(msg, isErr) {
+  const el = $("#toast");
+  (document.querySelector("dialog[open]") || document.body).append(el);  // 对话框开着时，提示要放进对话框里才不会被挡住
+  el.textContent = msg; el.className = "show" + (isErr ? " err" : "");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.className = ""; }, isErr ? 6000 : 2600);
+}
+const fail = e => toast(e.message || String(e), true);
+// 页面内的“确认 / 输入”对话框。ask("…") → true/false；ask("…", {input: "默认值"}) → 输入的文字或 null
+function ask(message, opt = {}) {
+  const dlg = $("#askDlg"), input = $("#askInput"), wantText = opt.input !== undefined;
+  $("#askText").textContent = message; $("#askYes").textContent = opt.yes || "确定"; $("#askNo").textContent = opt.no || "取消";
+  input.hidden = !wantText; input.value = wantText ? opt.input : "";
+  return new Promise(resolve => {
+    const done = ok => { dlg.close(); cleanup(); resolve(wantText ? (ok ? input.value.trim() || null : null) : ok); };
+    const onKey = e => { if (e.key === "Enter") { e.preventDefault(); done(true); } };
+    const onCancel = e => { e.preventDefault(); done(false); };
+    const cleanup = () => { $("#askYes").onclick = $("#askNo").onclick = null; dlg.removeEventListener("cancel", onCancel); input.removeEventListener("keydown", onKey); };
+    $("#askYes").onclick = () => done(true); $("#askNo").onclick = () => done(false);
+    dlg.addEventListener("cancel", onCancel); input.addEventListener("keydown", onKey);
+    dlg.showModal(); if (wantText) { input.focus(); input.select(); }
+  });
+}
+function fmtSize(n) { return n >= 1073741824 ? (n / 1073741824).toFixed(2) + " GB" : Math.max(1, Math.round(n / 1048576)) + " MB"; }
+function fmtClock(t) {
+  t = Math.max(0, Math.floor(t)); const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60;
+  return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(s).padStart(2, "0");
+}
+function fmtSpan(sec) {
+  sec = Math.max(0, Math.round(sec));
+  if (sec < 60) return sec + " 秒";
+  const m = Math.round(sec / 60);
+  return m < 60 ? m + " 分钟" : Math.floor(m / 60) + " 小时 " + (m % 60) + " 分";
+}
+const jobRunning = () => !!(S.job && S.job.running);
+
+// ───────── 设置 ─────────
+let saveTimer, pendingPatch = {};
+function setSetting(key, value, immediate) {
+  S.settings[key] = value; pendingPatch[key] = value;
+  renderSettings();
+  clearTimeout(saveTimer);
+  const flush = async () => {
+    const patch = pendingPatch; pendingPatch = {};
+    try {
+      const r = await api("/api/settings", patch);
+      if ("input_dir" in patch && r.settings) S.settings.hint = r.settings.hint;  // 剧情提示是按文件夹存的，换了文件夹要跟着换
+    } catch (e) { fail(e); }
+  };
+  if (immediate) return flush();
+  saveTimer = setTimeout(flush, 350);
+}
+function renderSettings() {
+  const st = S.settings;
+  for (const seg of $$(".seg")) {
+    const cur = String(st[seg.dataset.key]);
+    for (const b of $$("button", seg)) b.classList.toggle("on", b.dataset.value === cur);
+  }
+  for (const r of $$("input[type=range][data-key]")) {
+    if (document.activeElement !== r) r.value = st[r.dataset.key];
+    $("#" + r.dataset.key + "Val").textContent = Number(st[r.dataset.key]).toFixed(1).replace(/\.0$/, "") + "%";
+  }
+  $("#marginField").style.opacity = st.position === "middle" ? .4 : 1;
+  $$("#marginField input")[0].disabled = st.position === "middle";
+  for (const kind of ["input", "output"]) {
+    const el = $("#" + kind + "Path"), v = st[kind + "_dir"];
+    // 路径太长时省略开头、保留结尾（用 rtl 实现）；前面加一个 LRM 字符，免得开头的“/”被排到末尾去
+    el.textContent = v ? "‎" + v : "还没有选择"; el.title = v || ""; el.classList.toggle("unset", !v);
+  }
+  $("#controls").classList.toggle("locked", jobRunning());
+  renderStart();
+}
+for (const seg of $$(".seg")) seg.addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b || jobRunning()) return;
+  const key = seg.dataset.key; let v = b.dataset.value;
+  if (key === "bilingual") v = v === "true";
+  setSetting(key, v);
+  if (key === "position" || key === "bilingual") schedulePreview(0);
+});
+for (const r of $$("input[type=range][data-key]")) r.addEventListener("input", () => {
+  setSetting(r.dataset.key, Number(r.value)); schedulePreview(90);
+});
+
+// ───────── API Key ─────────
+function renderKey() {
+  const chip = $("#keyChip"), info = S.keyInfo;
+  $("#keyBanner").hidden = S.hasKey;
+  let cls = "", text;
+  if (!S.hasKey) { cls = "bad"; text = "还没有填 API Key"; }
+  else if (!info) { text = "DeepSeek 检查中…"; }
+  else if (info.ok) {
+    cls = "ok"; text = "DeepSeek 已连接";
+    if (info.balance && info.balance.total) text += ` · 余额 ${info.balance.currency === "USD" ? "$" : "¥"}${info.balance.total}`;
+    if (info.balance && info.balance.available === false) { cls = "bad"; text = "DeepSeek 余额不足"; }
+  } else { cls = info.auth ? "bad" : ""; text = info.auth ? "API Key 无效" : "DeepSeek 暂时连不上"; }
+  chip.className = "chip " + cls; $("#keyChipText").textContent = text;
+  $("#keyState").textContent = S.hasKey ? `已保存（结尾是 …${S.keyTail}）。要更换的话，粘贴新的 Key 再点保存。` : "还没有保存 Key。";
+  const sel = $("#model"), models = (info && info.models && info.models.length) ? info.models.slice() : [];
+  if (S.settings.translate_model && !models.includes(S.settings.translate_model)) models.unshift(S.settings.translate_model);
+  sel.replaceChildren(...models.map(m => new Option(m, m, false, m === S.settings.translate_model)));
+  renderStart();
+}
+async function checkKey(force) {
+  if (!S.hasKey) { S.keyInfo = null; return renderKey(); }
+  try { S.keyInfo = await api("/api/key/status" + (force ? "?force=1" : "")); } catch (e) { S.keyInfo = { ok: false, error: e.message }; }
+  renderKey();
+}
+async function saveKey(input, errEl, btn) {
+  const key = input.value.trim(); errEl.hidden = true;
+  if (!key) { errEl.textContent = "请先粘贴 Key"; errEl.hidden = false; return; }
+  btn.disabled = true; const old = btn.textContent; btn.textContent = "验证中…";
+  try {
+    const r = await api("/api/key", { key });
+    S.hasKey = true; S.keyTail = r.key_tail || key.slice(-4); S.keyInfo = r.ok ? r : null; input.value = "";
+    if (r.ok) toast("Key 可用，已保存 ✓"); else toast(r.error || "已保存", true);
+    const st = await api("/api/state"); S.settings = st.settings; renderSettings(); renderKey();
+    if (!r.ok) checkKey(true);
+  } catch (e) { errEl.textContent = e.message; errEl.hidden = false; }
+  btn.disabled = false; btn.textContent = old;
+}
+$("#keySave").onclick = () => saveKey($("#keyInput"), $("#keyError"), $("#keySave"));
+$("#keySave2").onclick = () => saveKey($("#keyInput2"), $("#keyError2"), $("#keySave2"));
+$("#keyInput").addEventListener("keydown", e => { if (e.key === "Enter") $("#keySave").click(); });
+$("#keyInput2").addEventListener("keydown", e => { if (e.key === "Enter") $("#keySave2").click(); });
+$("#keyChip").onclick = () => { if (!S.hasKey) { $("#keyInput").focus(); $("#keyBanner").scrollIntoView({ behavior: "smooth", block: "center" }); } else openSettings(); };
+
+// ───────── 设置对话框 ─────────
+function openSettings() {
+  $("#hint").value = S.settings.hint || ""; $("#useEmbedded").checked = !!S.settings.use_embedded_subs;
+  $("#keyError2").hidden = true; renderKey();
+  $("#settingsDlg").showModal();
+}
+$("#settingsBtn").onclick = openSettings;
+$("#hint").addEventListener("input", e => setSetting("hint", e.target.value));
+$("#useEmbedded").addEventListener("change", e => setSetting("use_embedded_subs", e.target.checked));
+$("#model").addEventListener("change", e => setSetting("translate_model", e.target.value));
+for (const b of $$("[data-close]")) b.onclick = () => b.closest("dialog").close();
+
+// ───────── 选文件夹 ─────────
+let dlgKind = "input", dlgPath = "";
+async function browse(path) {
+  let d;
+  try { d = await api("/api/browse?path=" + encodeURIComponent(path || "")); } catch (e) { return fail(e); }
+  dlgPath = d.path;
+  const parts = d.path.split("/").filter(Boolean), crumbs = $("#crumbs");
+  crumbs.replaceChildren();
+  const add = (label, p) => { const b = document.createElement("button"); b.textContent = label; b.onclick = () => { if (p !== dlgPath) browse(p); }; crumbs.append(b); };
+  add("Macintosh HD", "/");
+  parts.forEach((name, i) => { const sep = document.createElement("span"); sep.textContent = "›"; crumbs.append(sep); add(name, "/" + parts.slice(0, i + 1).join("/")); });
+  $("#shortcuts").replaceChildren(...d.shortcuts.map(s => { const b = document.createElement("button"); b.className = "btn sm"; b.textContent = s.name; b.onclick = () => browse(s.path); return b; }));
+  const dirs = $("#dirs"); dirs.replaceChildren();
+  if (d.parent) { const up = document.createElement("button"); up.className = "dir muted"; up.textContent = "↑ 返回上一层"; up.onclick = () => browse(d.parent); dirs.append(up); }
+  for (const item of d.dirs) {
+    const b = document.createElement("button"); b.className = "dir";
+    const ico = document.createElement("i"); ico.className = "ico"; const name = document.createElement("span"); name.textContent = item.name;
+    b.append(ico, name); b.onclick = () => browse(item.path); dirs.append(b);
+  }
+  if (!d.dirs.length && !d.error) { const e = document.createElement("div"); e.className = "empty"; e.textContent = "这里面没有子文件夹了"; dirs.append(e); }
+  dirs.scrollTop = 0;
+  $("#folderError").hidden = !d.error; $("#folderError").textContent = d.error || "";
+  $("#folderInfo").textContent = d.videos ? `这个文件夹里有 ${d.videos} 个视频` : (dlgKind === "input" ? "这个文件夹里没有视频" : "");
+}
+async function openFolderDlg(kind) {
+  dlgKind = kind;
+  $("#folderTitle").textContent = kind === "input" ? "视频在哪个文件夹？" : "加好字幕的视频存到哪个文件夹？";
+  $("#mkdirBtn").hidden = kind === "input";
+  await browse(S.settings[kind + "_dir"] || S.settings.input_dir || "");
+  $("#folderDlg").showModal();
+}
+for (const b of $$("[data-pick]")) b.onclick = () => { if (!jobRunning()) openFolderDlg(b.dataset.pick); };
+$("#mkdirBtn").onclick = async () => {
+  const name = await ask("新文件夹的名字：", { input: "中文字幕", yes: "新建" }); if (!name) return;
+  try { const r = await api("/api/mkdir", { parent: dlgPath, name }); await browse(r.path); } catch (e) { fail(e); }
+};
+$("#folderChoose").onclick = async () => {
+  const other = dlgKind === "input" ? S.settings.output_dir : S.settings.input_dir;
+  if (other && other.replace(/\/+$/, "") === dlgPath.replace(/\/+$/, "")) return toast("视频文件夹和输出文件夹不能是同一个，请另选", true);
+  $("#folderDlg").close();
+  if (dlgKind === "input") {
+    S.settings.input_dir = dlgPath; pendingPatch.input_dir = dlgPath;
+    if (!S.settings.output_dir) { S.settings.output_dir = dlgPath.replace(/\/+$/, "") + "_中文字幕"; pendingPatch.output_dir = S.settings.output_dir; }
+    await setSetting("input_dir", dlgPath, true);
+    S.pvPath = null; await loadVideos();
+  } else { await setSetting("output_dir", dlgPath, true); await loadVideos(); }
+};
+
+// ───────── 视频列表 ─────────
+async function loadVideos() {
+  let d;
+  try { d = await api("/api/videos"); } catch (e) { return fail(e); }
+  const firstLoad = !S.videos.length;
+  const known = new Set(S.videos.map(v => v.path));
+  S.videos = d.videos; S.listError = d.error;
+  const paths = new Set(d.videos.map(v => v.path));
+  for (const p of [...S.selected]) if (!paths.has(p)) S.selected.delete(p);
+  for (const v of d.videos) if ((firstLoad || !known.has(v.path)) && !v.done) S.selected.add(v.path);
+  renderList();
+  if (d.videos.length && (!S.pvPath || !paths.has(S.pvPath))) selectPreview(d.videos[0].path);
+  if (!d.videos.length) clearPreview();
+}
+function renderList() {
+  const list = $("#videoList"); list.replaceChildren();
+  $("#listTools").hidden = !S.videos.length;
+  $("#listCount").textContent = S.videos.length ? `（共 ${S.videos.length} 个）` : "";
+  if (!S.videos.length) {
+    const e = document.createElement("div"); e.className = "empty";
+    e.textContent = S.listError || (S.settings.input_dir ? "这个文件夹里没有找到视频文件" : "还没有选择视频文件夹");
+    list.append(e); return renderStart();
+  }
+  for (const v of S.videos) {
+    const row = document.createElement("div"); row.className = "row"; row.dataset.path = v.path;
+    const ck = document.createElement("label"); ck.className = "ck";
+    const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = S.selected.has(v.path);
+    cb.onchange = () => { cb.checked ? S.selected.add(v.path) : S.selected.delete(v.path); renderStart(); };
+    ck.append(cb);
+    const name = document.createElement("div"); name.className = "name";
+    const title = document.createElement("div"); title.className = "title"; title.textContent = v.name; title.title = v.name;
+    const bar = document.createElement("div"); bar.className = "bar"; bar.hidden = true; bar.append(document.createElement("i"));
+    name.append(title, bar);
+    const size = document.createElement("div"); size.className = "size"; size.textContent = fmtSize(v.size);
+    const status = document.createElement("div"); status.className = "status";
+    row.append(ck, name, size, status);
+    row.onclick = e => { if (e.target.closest(".ck, button")) return; selectPreview(v.path); };
+    list.append(row);
+  }
+  renderRows(); renderStart();
+}
+const STATE_TEXT = { queued: "排队中", wait_translate: "等待翻译", translate: "翻译中", wait_encode: "等待压制", encode: "压制视频", cancelled: "已取消" };
+function renderRows() {
+  const tasks = new Map((S.job ? S.job.tasks : []).map(t => [t.path, t]));
+  const running = jobRunning();
+  for (const row of $$("#videoList .row")) {
+    const v = S.videos.find(x => x.path === row.dataset.path); if (!v) continue;
+    const t = tasks.get(v.path), status = $(".status", row), bar = $(".bar", row), cb = $("input", row);
+    row.classList.toggle("current", v.path === S.pvPath);
+    cb.disabled = running; cb.checked = S.selected.has(v.path);
+    status.replaceChildren(); status.title = "";
+    const text = (s, cls) => { const el = document.createElement("span"); el.className = cls || "txt"; el.textContent = s; status.append(el); return el; };
+    const active = t && running && !["done", "error", "cancelled"].includes(t.state);
+    bar.hidden = !active;
+    if (active) {
+      $("i", bar).style.width = (t.overall * 100).toFixed(1) + "%";
+      let label = STATE_TEXT[t.state] || "";
+      if (t.state === "source") label = (t.message || "准备中") + (t.progress.source > 0 && t.progress.source < 1 ? ` ${Math.round(t.progress.source * 100)}%` : "");
+      if (t.state === "translate") label += ` ${Math.round(t.progress.translate * 100)}%`;
+      if (t.state === "encode") label += ` ${Math.round(t.progress.encode * 100)}%`;
+      text(label, "txt muted");
+    } else if (t && t.state === "error") {
+      text("失败：" + t.error, "txt").style.color = "var(--err)"; status.title = t.error;
+    } else if (t && t.state === "cancelled" && !v.done) {
+      text("已取消", "txt muted");
+    } else if (v.done || (t && t.state === "done")) {
+      const play = document.createElement("button"); play.className = "btn sm"; play.textContent = "▶ 播放"; play.title = "用播放器打开加好字幕的视频";
+      play.onclick = () => api("/api/open", { target: "video", path: outputOf(v) }).catch(fail);
+      status.append(play); text("已完成", "pill ok");
+    } else if (v.translated) {
+      text("已翻译，待压制", "pill note").title = "识别和翻译已经做过并保存了，再处理时只需要压制视频";
+    }
+  }
+}
+function outputOf(v) { return S.settings.output_dir.replace(/\/+$/, "") + "/" + v.name.replace(/\.[^.]+$/, "") + ".mp4"; }
+for (const b of $$("[data-select]")) b.onclick = () => {
+  if (jobRunning()) return;
+  S.selected = new Set(S.videos.filter(v => b.dataset.select === "all" || (b.dataset.select === "todo" && !v.done)).map(v => v.path));
+  renderRows(); renderStart();
+};
+function renderStart() {
+  const n = S.selected.size, btn = $("#startBtn"); let hint = "";
+  if (!S.hasKey) hint = "先在页面顶部填好 DeepSeek API Key";
+  else if (!S.settings.input_dir) hint = "先选择视频所在的文件夹";
+  else if (!S.settings.output_dir) hint = "先选择输出文件夹";
+  else if (!n) hint = S.videos.length ? "在上面勾选要处理的视频" : "";
+  else {
+    const redo = S.videos.filter(v => S.selected.has(v.path) && v.translated).length;
+    hint = "每 15 分钟的视频大约要处理 1～2 分钟" + (redo ? `；其中 ${redo} 个已翻译过，只需重新压制` : "");
+  }
+  btn.textContent = n ? `开始添加字幕（${n} 个视频）` : "开始添加字幕";
+  btn.disabled = !n || !S.hasKey || !S.settings.output_dir || jobRunning();
+  $("#startHint").textContent = hint;
+}
+
+// ───────── 预览 ─────────
+function clearPreview() {
+  S.pvPath = null; S.pvInfo = null;
+  $("#previewImg").hidden = true; $("#previewHint").hidden = false;
+  $("#previewHint").textContent = "选好视频文件夹后，这里会显示加上字幕的效果";
+  $("#scrub").disabled = true; $("#scrubTime").textContent = "--:-- / --:--"; $("#pvNote").textContent = "";
+}
+async function selectPreview(path) {
+  S.pvPath = path; renderRows();
+  const v = S.videos.find(x => x.path === path);
+  try {
+    const info = await api("/api/video-info?path=" + encodeURIComponent(path));
+    if (S.pvPath !== path) return;
+    S.pvInfo = info;
+    const scrub = $("#scrub"); scrub.max = Math.max(1, Math.floor(info.duration - 1)); scrub.disabled = false;
+    if (!(S.pvT > 0 && S.pvT < info.duration - 1)) S.pvT = Math.round(Math.min(info.duration * 0.15, 150));
+    scrub.value = S.pvT;
+    $("#previewBox").style.aspectRatio = `${info.width} / ${info.height}`;
+    $("#pvMeta").textContent = `${v ? v.name : ""}  ·  ${info.width}×${info.height}  ·  ${fmtClock(info.duration)}` + (info.text_subs ? "  ·  自带文字字幕" : "");
+    $("#pvNote").textContent = info.translated ? "（这一集已翻译过，显示的是真实字幕）" : "（示例文字）";
+    updateScrubLabel(); schedulePreview(0);
+  } catch (e) {
+    if (S.pvPath !== path) return;
+    $("#previewImg").hidden = true; $("#previewHint").hidden = false; $("#previewHint").textContent = e.message; $("#scrub").disabled = true;
+  }
+}
+function updateScrubLabel() { $("#scrubTime").textContent = `${fmtClock(S.pvT)} / ${S.pvInfo ? fmtClock(S.pvInfo.duration) : "--:--"}`; }
+$("#scrub").addEventListener("input", e => { S.pvT = Number(e.target.value); updateScrubLabel(); schedulePreview(120); });
+let pvTimer, pvSeq = 0;
+function schedulePreview(delay) { clearTimeout(pvTimer); pvTimer = setTimeout(refreshPreview, delay); }
+function refreshPreview() {
+  if (!S.pvPath || !S.pvInfo) return;
+  const seq = ++pvSeq, st = S.settings, box = $("#previewBox");
+  const q = new URLSearchParams({ path: S.pvPath, t: S.pvT.toFixed(2), position: st.position, margin: st.margin, font_scale: st.font_scale, bilingual: st.bilingual ? "1" : "0", _: Date.now() });
+  box.classList.add("loading");
+  fetch("/api/preview?" + q).then(async res => {
+    if (seq !== pvSeq) return;
+    if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || "预览失败"); }
+    const url = URL.createObjectURL(await res.blob());
+    if (seq !== pvSeq) return URL.revokeObjectURL(url);
+    const img = $("#previewImg"), old = img.src;
+    img.onload = () => { if (old.startsWith("blob:")) URL.revokeObjectURL(old); };
+    img.src = url; img.hidden = false; $("#previewHint").hidden = true; box.classList.remove("loading");
+  }).catch(e => {
+    if (seq !== pvSeq) return;
+    box.classList.remove("loading"); $("#previewImg").hidden = true; $("#previewHint").hidden = false; $("#previewHint").textContent = e.message;
+  });
+}
+
+// ───────── 任务 ─────────
+$("#startBtn").onclick = async () => {
+  const paths = S.videos.filter(v => S.selected.has(v.path)).map(v => v.path);
+  const redo = S.videos.filter(v => S.selected.has(v.path) && v.done).length;
+  if (redo && !await ask(`选中的视频里有 ${redo} 个已经做过了，重新处理会覆盖原来加好字幕的文件。继续吗？`, { yes: "继续" })) return;
+  $("#startBtn").disabled = true;
+  try {
+    clearTimeout(saveTimer); if (Object.keys(pendingPatch).length) { const patch = pendingPatch; pendingPatch = {}; await api("/api/settings", patch); }
+    S.job = await api("/api/start", { paths }); renderJob(); startPolling();
+  } catch (e) { fail(e); renderStart(); }
+};
+$("#cancelBtn").onclick = async () => {
+  if (!await ask("确定要取消吗？已经完成的视频会保留，识别和翻译的结果也会保留。", { yes: "取消任务", no: "继续处理" })) return;
+  $("#cancelBtn").disabled = true;
+  try { await api("/api/cancel", {}); } catch (e) { fail(e); }
+};
+function startPolling() { if (!S.polling) { S.polling = true; setTimeout(pollJob, 800); } }
+async function pollJob() {
+  if (S.quitting) return;
+  let wasRunning = jobRunning();
+  try { S.job = (await api("/api/job")).job; }
+  catch (e) { setTimeout(pollJob, 3000); return; }
+  renderJob();
+  if (jobRunning()) return void setTimeout(pollJob, 1000);
+  S.polling = false;
+  if (wasRunning) { await loadVideos(); checkKey(true); }
+}
+function renderJob() {
+  const j = S.job, running = jobRunning();
+  $("#idleBar").hidden = running; $("#runBar").hidden = !running;
+  $("#cancelBtn").disabled = !running || (j && j.cancelled);
+  const notice = $("#notice"); notice.hidden = true;
+  if (j && running) {
+    $("#totalBar").style.width = (j.overall * 100).toFixed(1) + "%";
+    let text = j.cancelled ? "正在取消…" : `已完成 ${j.finished} / ${j.total} 个 · 已用 ${fmtSpan(j.elapsed)}`;
+    if (!j.cancelled && j.eta != null) text += ` · 大约还需 ${fmtSpan(j.eta)}`;
+    $("#runText").textContent = text;
+    document.title = `${Math.round(j.overall * 100)}% · 字幕翻译工具`;
+  } else {
+    document.title = "字幕翻译工具";
+    if (j) {
+      notice.hidden = false; const act = $("#noticeActions"); act.replaceChildren();
+      let cls = "ok", text;
+      if (j.fatal) { cls = "err"; text = `已停止：${j.fatal}。处理好以后再点“开始”，已经做完的部分不会重做。`; }
+      else if (j.cancelled) { cls = "warn"; text = `已取消。完成了 ${j.done} 个，其余的进度已保存，下次会接着做。`; }
+      else if (j.failed) { cls = j.done ? "warn" : "err"; text = `${j.done} 个视频已加好字幕，${j.failed} 个失败（原因见上面列表）。用时 ${fmtSpan(j.elapsed)}。`; }
+      else text = `✓ ${j.done} 个视频已全部加好中文字幕，用时 ${fmtSpan(j.elapsed)}。`;
+      notice.className = "notice " + cls; $("#noticeText").textContent = text;
+      if (j.done) { const b = document.createElement("button"); b.className = "btn"; b.textContent = "打开输出文件夹"; b.onclick = () => api("/api/open", { target: "output" }).catch(fail); act.append(b); }
+    }
+  }
+  renderRows(); renderSettings();
+}
+
+// ───────── 退出 / 启动 ─────────
+$("#quitBtn").onclick = async () => {
+  if (jobRunning() && !await ask("还有视频正在处理，退出会中断它们（已完成的会保留）。确定退出吗？", { yes: "退出", no: "不退出" })) return;
+  S.quitting = true;
+  try { await api("/api/quit", {}); } catch (e) { /* 后台已经关了 */ }
+  $("#gone").hidden = false;
+};
+// 任务可能是在另一个浏览器窗口里开始的：空闲时每隔几秒看一眼，有任务在跑就跟上进度
+setInterval(async () => {
+  if (S.polling || S.quitting || document.hidden) return;
+  try { const { job } = await api("/api/job"); if (job && job.running) { S.job = job; renderJob(); startPolling(); } } catch (e) { /* 后台没开 */ }
+}, 5000);
+(async function init() {
+  try {
+    const st = await api("/api/state");
+    S.settings = st.settings; S.hasKey = st.has_key; S.keyTail = st.key_tail; S.job = st.job;
+    $("#versionText").textContent = "版本 " + st.version;
+    renderSettings(); renderKey(); renderJob();
+    await loadVideos();
+    if (jobRunning()) startPolling();
+    checkKey(false);
+  } catch (e) { fail(e); }
+})();
+</script>
+</body>
+</html>
